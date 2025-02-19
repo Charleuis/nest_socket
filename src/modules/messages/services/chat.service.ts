@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Message } from '../entities/message.entity';
 import { CreateChatDto } from '../dto/create-chat.dto';
 import { Chat } from '../entities/chat.entity';
+import { createResponse } from 'src/common/response/response.helper';
 
 @Injectable()
 export class ChatService {
@@ -15,16 +16,17 @@ export class ChatService {
   ) {}
 
   // Send a new message
-  async sendMessage(createChatDto: CreateChatDto): Promise<Message> {
-    const { receiverId, content, senderId, messageType, groupName } = createChatDto;
-    console.log(createChatDto);
+  async sendMessage(createChatDto: CreateChatDto) {
+    const { receiverId, content, senderId, messageType, groupName } = createChatDto;    
+    
+    if (!senderId || !content) {
+      throw new Error('senderId and content are required');
+    }
     
     let chatId;
 
     // First, find or create chat
     if (receiverId) {
-        console.log("receiverId",receiverId);
-        
       const existingChat = await this.chatModel.findOne({
         members: { $all: [senderId, receiverId] },
       });
@@ -37,64 +39,68 @@ export class ChatService {
           members: [senderId, receiverId],
           timestamp: new Date(),
           type: 'private',
-          creator: senderId,
+          createdBy: senderId,
         });
         chatId = newChat._id;        
       }
-    }else{
-        const existingGroupChat = await this.chatModel.findOne({
-            creator: senderId,
-            groupName: groupName,
+    } else {
+      if (!groupName) {
+        throw new Error('groupName is required for group chats');
+      }
+
+      const existingGroupChat = await this.chatModel.findOne({
+        createdBy: senderId,
+        groupName: groupName,
+      });
+      
+      if (existingGroupChat) {
+        chatId = existingGroupChat._id;
+      } else {
+        const newGroupChat = await this.chatModel.create({
+          members: [senderId],
+          timestamp: new Date(),
+          type: 'group',
+          groupName: groupName,
+          createdBy: senderId,
+          admins: [senderId],
         });
-        console.log("existingGroupChat",existingGroupChat);
-        if(existingGroupChat){
-            chatId = existingGroupChat._id;
-        }else{
-            const newGroupChat = await this.chatModel.create({
-                members: [senderId],
-                timestamp: new Date(),
-                type: 'group',
-                groupName: groupName,
-                createdBy: senderId,
-                admins: [senderId],
-            });
-            chatId = newGroupChat._id;
-            console.log("newGroupChat",newGroupChat);
-        }
+        chatId = newGroupChat._id;
+      }
     }
     // Then create the message
     const message = await this.messageModel.create({
       senderId,
       chatId,
-      receiverId,
       content,
       messageType,
       timestamp: new Date(),
     });
 
-    return message;
+    return createResponse(HttpStatus.CREATED, 'Message sent successfully', message);
   }
 
-  // Get chat history between two users
-  async getChatHistory(user1Id: number, user2Id: number): Promise<Message[]> {
-    return await this.messageModel.find({
-      $or: [
-        { senderId: user1Id, receiverId: user2Id },
-        { senderId: user2Id, receiverId: user1Id }
-      ]
-    }).sort({ timestamp: 1 });
-  }
+  async getPrivateChat(userId: string, chatId?: string) {
+    if (!chatId) {
+      const userChats = await this.chatModel.find({
+        members: userId
+      }).select('_id');
 
-  // Get recent conversations for a user
-  async getRecentChats(userId: number): Promise<Message[]> {
-    return await this.messageModel.find({
-      $or: [
-        { senderId: userId },
-        { receiverId: userId }
-      ]
-    })
-    .sort({ timestamp: -1 })
-    .limit(10);
+      const messages = await this.messageModel.find({
+        chatId: { $in: userChats.map(chat => chat._id) }
+      }).sort({ timestamp: -1 });
+
+      return createResponse(HttpStatus.OK, 'Messages fetched successfully', messages);
+    } else {
+      const messages = await this.messageModel.find({
+        chatId: new Types.ObjectId(chatId)
+      }).sort({ timestamp: -1 });
+
+      if (!messages.length) {
+        return createResponse(HttpStatus.NOT_FOUND, 'No messages found', []);
+      }
+
+    return createResponse(HttpStatus.OK, 'Messages fetched successfully', messages);
+    }
   }
 
   // Delete a message
