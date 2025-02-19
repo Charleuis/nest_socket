@@ -33,7 +33,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
     user.name = updateUserDto.name;
-    user.pic = updateUserDto.pic;
+    user.profilePicture = updateUserDto.pic;
     await user.save();
     return user;
   }

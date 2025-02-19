@@ -43,7 +43,7 @@ export class AuthService {
       _id: user._id,
       name: user.name,
       email: user.email,
-      pic: user.pic,
+      profilePicture: user.profilePicture,
       token,
       refreshToken
       });
@@ -68,7 +68,7 @@ export class AuthService {
       _id: user._id,
       name: user.name,
       email: user.email,
-      pic: user.pic,
+      profilePicture: user.profilePicture,
       token,
       refreshToken
     });
