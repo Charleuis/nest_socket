@@ -3,10 +3,6 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 export class CreateChatDto {
   @IsString()
   @IsNotEmpty()
-  senderId: string;
-
-  @IsString()
-  @IsNotEmpty()
   content: string;
 
   @IsEnum(['text', 'image', 'audio', 'video'])

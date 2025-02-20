@@ -14,6 +14,7 @@ import { RefreshTokenDocument } from '../entities/refersh-token.entity';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { createResponse } from 'src/common/response/response.helper';
 import { isEmail } from 'class-validator';
+import { JwtUserPayload } from 'src/common/interface/jwt-user-payload';
 
 @Injectable()
 export class AuthService {
@@ -37,7 +38,7 @@ export class AuthService {
       password: hashedPassword,
     });    
 
-    const token = await generateToken(this.jwtService, user._id.toString());
+    const token = await generateToken(this.jwtService, { id: user._id.toString(), name: user.name } as JwtUserPayload);
     const refreshToken = await generateRefreshToken(this.jwtService, user._id as Types.ObjectId, this.refreshTokenModel);
     return createResponse(HttpStatus.CREATED, 'User created successfully', {
       _id: user._id,
@@ -61,7 +62,7 @@ export class AuthService {
     if (!isPasswordMatch) {
       throw new BadRequestException('Invalid password');
     }
-    const token = await generateToken(this.jwtService, user.email.toString());
+    const token = await generateToken(this.jwtService, { id: user._id.toString(), name: user.name } as JwtUserPayload);
     const refreshToken = await generateRefreshToken(this.jwtService, user._id as Types.ObjectId, this.refreshTokenModel);
     const { password, ...userWithoutPassword } = user.toObject();
     return createResponse(HttpStatus.OK, 'Login successful', {
@@ -80,7 +81,11 @@ export class AuthService {
     if (!decoded) {
       throw new BadRequestException('Invalid refresh token');
     }
-    const token = await generateToken(this.jwtService, decoded.userId.toString());
+    const user = await this.userModel.findById(decoded.userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    const token = await generateToken(this.jwtService, { id: decoded.userId.toString(), name: user.name } as JwtUserPayload);
     const newRefreshToken = await generateRefreshToken(this.jwtService, decoded.userId, this.refreshTokenModel);
     return createResponse(HttpStatus.OK, 'Refresh token successful', {
       userToken: token, refreshToken: newRefreshToken });

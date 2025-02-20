@@ -5,6 +5,7 @@ import { Message } from '../entities/message.entity';
 import { CreateChatDto } from '../dto/create-chat.dto';
 import { Chat } from '../entities/chat.entity';
 import { createResponse } from 'src/common/response/response.helper';
+import { JwtUserPayload } from 'src/common/interface/jwt-user-payload';
 
 @Injectable()
 export class ChatService {
@@ -16,8 +17,9 @@ export class ChatService {
   ) {}
 
   // Send a new message
-  async sendMessage(createChatDto: CreateChatDto) {
-    const { receiverId, content, senderId, messageType, groupName } = createChatDto;    
+  async sendMessage(createChatDto: CreateChatDto, user: JwtUserPayload) {
+    const { receiverId, content, messageType, groupName } = createChatDto;     
+    const senderId = user.id;
     
     if (!senderId || !content) {
       throw new Error('senderId and content are required');
@@ -79,7 +81,8 @@ export class ChatService {
     return createResponse(HttpStatus.CREATED, 'Message sent successfully', message);
   }
 
-  async getPrivateChat(userId: string, chatId?: string) {
+  async getPrivateChat(user: JwtUserPayload, chatId?: string) {
+    const userId = user.id;
     if (!chatId) {
       const userChats = await this.chatModel.find({
         members: userId

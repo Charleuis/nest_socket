@@ -7,9 +7,6 @@ export class Chat {
   @Prop({ type: String, enum: ['private', 'group'], required: true })
   type: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
-  creator: Types.ObjectId; 
-
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], required: true })
   members: Types.ObjectId[]; 
 

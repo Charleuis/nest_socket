@@ -3,9 +3,10 @@ import { Types, Model } from 'mongoose';
 import { RefreshTokenDocument } from "./entities/refersh-token.entity";
 import { InternalServerErrorException } from "@nestjs/common";
 import { v4 as uuidv4 } from 'uuid';
+import { JwtUserPayload } from "src/common/interface/jwt-user-payload";
 
-export async function generateToken(jwtService: JwtService, userId: string) {
-    const payload = { id: userId, name: userId };
+export async function generateToken(jwtService: JwtService, user: JwtUserPayload) {
+    const payload = { id: user.id, name: user.name };
     const token = await jwtService.signAsync(payload);
     return token;
 }
