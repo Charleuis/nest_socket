@@ -41,7 +41,7 @@ export class ChatService {
           members: [senderId, receiverId],
           timestamp: new Date(),
           type: 'private',
-          createdBy: senderId,
+          createdBy: new Types.ObjectId(senderId),
         });
         chatId = newChat._id;        
       }
@@ -51,7 +51,7 @@ export class ChatService {
       }
 
       const existingGroupChat = await this.chatModel.findOne({
-        createdBy: senderId,
+        createdBy: new Types.ObjectId(senderId),
         groupName: groupName,
       });
       
@@ -59,24 +59,24 @@ export class ChatService {
         chatId = existingGroupChat._id;
       } else {
         const newGroupChat = await this.chatModel.create({
-          members: [senderId],
+          members: [new Types.ObjectId(senderId)],
           timestamp: new Date(),
           type: 'group',
           groupName: groupName,
-          createdBy: senderId,
-          admins: [senderId],
+          createdBy: new Types.ObjectId(senderId),
+          admins: [new Types.ObjectId(senderId)],
         });
         chatId = newGroupChat._id;
       }
     }
     // Then create the message
     const message = await this.messageModel.create({
-      senderId,
+      senderId: new Types.ObjectId(senderId),
       chatId,
       content,
       messageType,
-      timestamp: new Date(),
     });
+    await this.chatModel.findByIdAndUpdate(chatId, { lastMessage: message._id });
 
     return createResponse(HttpStatus.CREATED, 'Message sent successfully', message);
   }
@@ -90,13 +90,13 @@ export class ChatService {
 
       const messages = await this.messageModel.find({
         chatId: { $in: userChats.map(chat => chat._id) }
-      }).sort({ timestamp: -1 });
+      }).sort({ updatedAt: -1 });
 
       return createResponse(HttpStatus.OK, 'Messages fetched successfully', messages);
     } else {
       const messages = await this.messageModel.find({
         chatId: new Types.ObjectId(chatId)
-      }).sort({ timestamp: -1 });
+      }).sort({ updatedAt: -1 });
 
       if (!messages.length) {
         return createResponse(HttpStatus.NOT_FOUND, 'No messages found', []);

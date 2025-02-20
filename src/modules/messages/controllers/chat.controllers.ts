@@ -13,7 +13,7 @@ export class ChatController {
     return this.chatService.sendMessage(createChatDto, user);
   }
 
-  @Get('/private')
+  @Get()
   async getPrivateChat(@User() user: JwtUserPayload, @Query('chatId') chatId: string) {
     return this.chatService.getPrivateChat(user ,chatId);
   }

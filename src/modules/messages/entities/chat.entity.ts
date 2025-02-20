@@ -13,14 +13,17 @@ export class Chat {
   @Prop({ type: Types.ObjectId, ref: 'Message', default: null })
   lastMessage: Types.ObjectId;
 
-  @Prop({ type: [String], required: true, ref: 'User' })
-  admins: string[]; 
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }] })
+  admins: Types.ObjectId[]; 
 
-  @Prop({ type: String, required: true, ref: 'User' })
-  createdBy: string; 
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  createdBy: Types.ObjectId; 
 
-  @Prop({ type: String, default: null })
+  @Prop({ type: String })
   groupName: string;
+
+  @Prop({ type: String})
+  groupImage: string;
 }
 
 export const ChatSchema = SchemaFactory.createForClass(Chat);
