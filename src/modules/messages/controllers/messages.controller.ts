@@ -3,10 +3,10 @@ import { MessagesService } from '../services/messages.service';
 import { CreateMessageDto } from '../dto/create-message.dto';
 import { UpdateMessageDto } from '../dto/update-message.dto';
 import { CreateChatDto } from '../dto/create-chat.dto';
-// import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { User } from 'src/decorator/user.decorator';
+import { JwtUserPayload } from 'src/common/interface/jwt-user-payload';
 
 @Controller('messages')
-// @UseGuards(JwtAuthGuard)
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
@@ -20,18 +20,13 @@ export class MessagesController {
     return this.messagesService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.messagesService.findOne(+id);
+  @Patch(':messageId')
+  update(@User() user: JwtUserPayload, @Param('messageId') messageId: string, @Body() updateMessageDto: UpdateMessageDto) {
+    return this.messagesService.update(user,messageId, updateMessageDto);
   }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateMessageDto: UpdateMessageDto) {
-  //   return this.messagesService.update(+id, updateMessageDto);
-  // }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.messagesService.remove(+id);
+  @Delete(':messageId')
+  remove(@User() user: JwtUserPayload, @Param('messageId') messageId: string) {
+    return this.messagesService.remove(user, messageId);
   }
 }
