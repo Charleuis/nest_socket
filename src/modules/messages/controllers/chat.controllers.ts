@@ -39,4 +39,9 @@ export class ChatController {
   async deleteGroupChat(@Param('chatId') chatId: string, @User() user: JwtUserPayload) {
     return this.chatService.deleteGroupChat(chatId, user);
   }
+
+  @Patch('group/:chatId/leave')
+  async leaveGroupChat(@Param('chatId') chatId: string, @User() user: JwtUserPayload) {
+    return this.chatService.leaveGroupChat(chatId, user);
+  }
 }

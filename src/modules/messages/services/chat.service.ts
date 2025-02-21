@@ -285,6 +285,38 @@ async sendMessage(createChatDto: CreateChatDto, user: JwtUserPayload) {
     }
 
     await this.chatModel.findByIdAndDelete(chatId);
+    await this.messageModel.deleteMany({ chatId: new Types.ObjectId(chatId) });
     return createResponse(HttpStatus.OK, 'Group chat deleted successfully');
+  }
+
+  //LEAVE GROUP CHAT
+  async leaveGroupChat(chatId: string, user: JwtUserPayload) {
+    const userId = user.id;
+    const groupChat = await this.chatModel.findById(chatId);
+    if (!groupChat) {
+      return createResponse(HttpStatus.NOT_FOUND, 'Group chat not found');
+    }
+    if (!groupChat.members.includes(new Types.ObjectId(userId))) {
+      return createResponse(HttpStatus.FORBIDDEN, 'You are not a member of this group');
+    }
+
+    // Check if this is the last member
+    if (groupChat.members.length === 1) {
+      await this.chatModel.findByIdAndDelete(chatId);
+      return createResponse(HttpStatus.OK, 'Group chat deleted as you were the last member');
+    }
+
+    // Update operation to remove user from members and admins (if they are an admin)
+    const updateQuery = {
+      $pull: { members: new Types.ObjectId(userId) }
+    };
+
+    if (groupChat.admins.includes(new Types.ObjectId(userId))) {
+      updateQuery.$pull['admins'] = new Types.ObjectId(userId);
+    }
+
+    await this.chatModel.findByIdAndUpdate(chatId, updateQuery);
+
+    return createResponse(HttpStatus.OK, 'Left group chat successfully');
   }
 }
