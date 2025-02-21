@@ -2,6 +2,10 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateChatDto {
   @IsString()
+  @IsOptional()
+  chatId?: string;
+
+  @IsString()
   @IsNotEmpty()
   content: string;
 

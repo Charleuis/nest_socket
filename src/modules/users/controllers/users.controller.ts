@@ -40,6 +40,4 @@ export class UsersController {
   remove(@User() user: JwtUserPayload) {
     return this.usersService.remove(user.id);
   }
-
-  //if token is valid
 }

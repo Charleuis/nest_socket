@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { Chat } from '../entities/chat.entity';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from '../../users/entities/user.entity';
 import { Message } from '../entities/message.entity';
 import { CreateMessageDto } from '../dto/create-message.dto';
+import { UpdateMessageDto } from '../dto/update-message.dto';
+import { createResponse } from 'src/common/response/response.helper';
+import { JwtUserPayload } from 'src/common/interface/jwt-user-payload';
 
 @Injectable()
 export class MessagesService {
@@ -87,11 +90,32 @@ export class MessagesService {
     return `This action returns a #${id} message`;
   }
 
-  // update(id: number, updateChatDto: UpdateChatDto) {
-  //   return `This action updates a #${id} message`;
-  // }
+  async update(user: JwtUserPayload, messageId: string, updateMessageDto: UpdateMessageDto) {
+    const { content } = updateMessageDto;
+    const message = await this.messageModel.findById(messageId);
+    
+    if (!message) {
+      throw new Error('Message not found');
+    }
+    // Check if the user is the sender of the message
+    if (message.senderId.toString() == user.id) {
+      throw new Error('You are not authorized to update this message');
+    }
+    message.content = content;
+    await message.save();
 
-  remove(id: number) {
-    return `This action removes a #${id} message`;
+    return createResponse(HttpStatus.OK, 'Message updated successfully', message);
+  }
+
+  async remove(user: JwtUserPayload, messageId: string) {
+    const message = await this.messageModel.findById(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+    if (message.senderId.toString() == user.id) {
+      throw new Error('You are not authorized to delete this message');
+    }
+    await message.deleteOne();
+    return createResponse(HttpStatus.OK, 'Message deleted successfully', message);
   }
 }

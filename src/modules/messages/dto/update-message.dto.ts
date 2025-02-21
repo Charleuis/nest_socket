@@ -1,4 +1,8 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateMessageDto } from './create-message.dto';
-
-export class UpdateMessageDto extends PartialType(CreateMessageDto) {}
+import { IsString, IsNotEmpty } from 'class-validator';
+export class UpdateMessageDto extends PartialType(CreateMessageDto) {
+    @IsString()
+    @IsNotEmpty()
+    content: string;
+}

@@ -22,7 +22,7 @@ export class Chat {
   @Prop({ type: String })
   groupName: string;
 
-  @Prop({ type: String})
+  @Prop({ type: String })
   groupImage: string;
 }
 
