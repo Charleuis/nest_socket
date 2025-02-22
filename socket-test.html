@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Application Test</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .login-form, .chat-form {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .chat-container {
+            display: flex;
+            gap: 20px;
+        }
+        .chat-list {
+            width: 250px;
+            border-right: 1px solid #ccc;
+            padding-right: 10px;
+        }
+        .chat-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .chat-item:hover {
+            background-color: #f5f5f5;
+        }
+        .chat-item.active {
+            background-color: #e3f2fd;
+        }
+        .chat-main {
+            flex-grow: 1;
+        }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin: 8px 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .sent {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+        }
+        .received {
+            background-color: #fff;
+            margin-right: auto;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+        input, button {
+            margin: 5px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #e3f2fd;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #bbdefb;
+        }
+        button:disabled {
+            background-color: #eee;
+            cursor: not-allowed;
+        }
+        .hidden {
+            display: none;
+        }
+
+        .message-input-container {
+            display: flex;
+            gap: 10px;
+            padding: 10px 0;
+        }
+        .message-input-container input {
+            flex-grow: 1;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chat Application Test</h1>
+        <div id="connection-status" class="status">Not Connected</div>
+
+        <!-- Login Form -->
+        <div id="login-section" class="login-form">
+            <h2>Login</h2>
+            <input type="email" id="email" placeholder="Email" value=""><br>
+            <input type="password" id="password" placeholder="Password"><br>
+            <button onclick="login()">Login</button>
+        </div>
+
+        <!-- Chat Section -->
+        <div id="chat-section" class="chat-form hidden">
+            <h2>Chat</h2>
+            <div class="chat-container">
+                <div class="chat-list">
+                    <h3>Your Chats</h3>
+                    <div id="chats-list"></div>
+                </div>
+                <div class="chat-main">
+                    <div id="current-chat-info" class="status">Select a chat to start messaging</div>
+                    <div id="messages" class="messages"></div>
+                    <div class="message-input-container">
+                        <input type="text" id="message" placeholder="Type a message" disabled>
+                        <button onclick="sendMessage()" id="send-button" disabled>Send</button>
+                        <button onclick="disconnect()">Disconnect</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let currentUser = null;
+        let accessToken = null;
+        let currentChat = null;
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('http://localhost:3000/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    console.log('Login successful:', data);
+                    accessToken = data.data.token;
+                    currentUser = {
+                        id: data.data._id,
+                        name: data.data.name,
+                        email: data.data.email
+                    };
+                    
+                    // For debugging
+                    console.log('Current user data:', currentUser);
+                    
+                    // Hide login, show chat
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('chat-section').classList.remove('hidden');
+                    
+                    // Load chats and connect to WebSocket
+                    await loadChats();
+                    connectWebSocket();
+                } else {
+                    alert('Login failed: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed: ' + error.message);
+            }
+        }
+
+        async function loadChats() {
+            try {
+                const response = await fetch('http://localhost:3000/chats', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    displayChats(data.data);
+                } else {
+                    console.error('Failed to load chats:', data.message);
+                    if (response.status === 401) {
+                        // Handle unauthorized error
+                        alert('Session expired. Please login again.');
+                        disconnect();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading chats:', error);
+            }
+        }
+
+        function displayChats(chats) {
+            const chatsList = document.getElementById('chats-list');
+            chatsList.innerHTML = '';
+            
+            chats.forEach(chat => {
+                const chatElement = document.createElement('div');
+                chatElement.className = 'chat-item';
+                chatElement.textContent = chat.groupName || `Chat ${chat._id}`;
+                chatElement.onclick = () => selectChat(chat);
+                chatsList.appendChild(chatElement);
+            });
+        }
+
+        async function selectChat(chat) {
+            currentChat = chat;
+            
+            // Update UI
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            document.getElementById('current-chat-info').textContent = 
+                `Chatting in: ${chat.groupName || `Chat ${chat._id}`}`;
+            
+            // Enable message input
+            document.getElementById('message').disabled = false;
+            document.getElementById('send-button').disabled = false;
+            
+            // Clear messages
+            document.getElementById('messages').innerHTML = '';
+            
+            // Load chat messages
+            await loadChatMessages(chat._id);
+            
+            // Leave previous chat room if any
+            if (socket) {
+                socket.emit('leaveChat', currentChat._id);
+                // Join new chat room
+                socket.emit('joinChat', chat._id);
+            }
+        }
+
+        async function loadChatMessages(chatId) {
+            try {
+                const response = await fetch(`http://localhost:3000/chats?chatId=${chatId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    // Sort messages by date
+                    const messages = data.data.sort((a, b) => 
+                        new Date(a.createdAt) - new Date(b.createdAt)
+                    );
+                    
+                    // Display each message
+                    messages.forEach(message => {
+                        displayMessage(message, message.senderId === currentUser.id ? 'sent' : 'received');
+                    });
+                    
+                    // Scroll to bottom
+                    const messagesDiv = document.getElementById('messages');
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                } else {
+                    console.error('Failed to load messages:', data.message);
+                }
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        function displayMessage(message, type) {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            
+            // Create message content with timestamp
+            const timestamp = new Date(message.createdAt).toLocaleTimeString();
+            const content = document.createElement('div');
+            content.textContent = message.content;
+            
+            const time = document.createElement('div');
+            time.className = 'timestamp';
+            time.textContent = timestamp;
+            
+            messageElement.appendChild(content);
+            messageElement.appendChild(time);
+            
+            messagesDiv.appendChild(messageElement);
+            
+            // Always scroll to the latest message
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function connectWebSocket() {
+            if (!currentUser) return;
+
+            socket = io('http://localhost:3000/chat', {
+                query: { 
+                    userId: currentUser.id
+                },
+                auth: {
+                    token: accessToken
+                },
+                // Add these options to prevent unnecessary reconnections
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('connection-status').textContent = 'Connected (Receiving messages)';
+                console.log('Connected to WebSocket for receiving messages');
+                
+                // Emit user online status
+                socket.emit('userStatus', { 
+                    userId: currentUser.id, 
+                    status: 'online',
+                    lastSeen: new Date().toISOString()
+                });
+                
+                // Join current chat if exists
+                if (currentChat) {
+                    socket.emit('joinChat', currentChat._id);
+                }
+            });
+
+            socket.on('newMessage', (message) => {
+                console.log('Received new message:', message); // Debug log
+                if (currentChat && message.chatId === currentChat._id) {
+                    console.log('Displaying new message for chat:', currentChat._id);
+                    displayMessage({
+                        content: message.content,
+                        senderId: message.senderId,
+                        createdAt: message.createdAt || new Date().toISOString()
+                    }, message.senderId === currentUser.id ? 'sent' : 'received');
+                }
+            });
+
+            // Add error handling
+            socket.on('error', (error) => {
+                console.error('Socket error:', error);
+            });
+
+            // Add beforeunload event to handle page close/refresh
+            window.addEventListener('beforeunload', () => {
+                socket.emit('userStatus', { 
+                    userId: currentUser.id, 
+                    status: 'offline',
+                    lastSeen: new Date().toISOString()
+                });
+            });
+
+            // Handle disconnection
+            socket.on('disconnect', async () => {
+                console.log('Socket disconnected because:', reason);
+                document.getElementById('connection-status').textContent = 'Disconnected';
+                
+                // Emit offline status
+                socket.emit('userStatus', { 
+                    userId: currentUser.id, 
+                    status: 'offline',
+                    lastSeen: new Date().toISOString()
+                });
+                
+                // Attempt to reconnect if not intentionally disconnected
+                if (reason === 'io server disconnect') {
+                    socket.connect();
+                }
+            });
+        }
+
+        async function sendMessage() {
+            if (!currentUser || !currentChat) return;
+
+            const messageInput = document.getElementById('message');
+            const messageText = messageInput.value;
+            if (!messageText.trim()) return;
+
+            const payload = {
+                content: messageText,
+                chatId: currentChat._id,
+                messageType: 'text'
+            };
+
+            try {
+                // Clear input immediately for better UX
+                messageInput.value = '';
+                
+                // Display message locally immediately
+                displayMessage({
+                    content: messageText,
+                    senderId: currentUser.id,
+                    createdAt: new Date().toISOString()
+                }, 'sent');
+
+                // Emit through socket first
+                socket.emit('sendMessage', payload);
+                
+                // Then send HTTP request
+                const response = await fetch('http://localhost:3000/chats', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    console.error('Failed to send message:', data);
+                    alert(`Failed to send message: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Error sending message. Please try again.');
+            }
+        }
+
+        // Prevent form submission on Enter key
+        document.getElementById('message').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent form submission
+                sendMessage();
+            }
+        });
+
+        function disconnect() {
+            if (socket) {
+                // Emit offline status before disconnecting
+                socket.emit('userStatus', { 
+                    userId: currentUser.id, 
+                    status: 'offline',
+                    lastSeen: new Date().toISOString()
+                });
+                socket.disconnect();
+            }
+            // Reset UI
+            document.getElementById('chat-section').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('messages').innerHTML = '';
+            document.getElementById('chats-list').innerHTML = '';
+            currentUser = null;
+            accessToken = null;
+            currentChat = null;
+        }
+
+        // Add enter key support for login
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+    </script>
+</body>
+</html> 
