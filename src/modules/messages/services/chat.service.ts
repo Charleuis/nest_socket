@@ -107,26 +107,20 @@ async sendMessage(createChatDto: CreateChatDto, user: JwtUserPayload) {
 //GET PRIVATE CHAT
   async getPrivateChat(user: JwtUserPayload, chatId?: string) {
     const userId = user.id;
-    if (!chatId) {
-      const userChats = await this.chatModel.find({
-        members: userId
-      }).select('_id');
-
+    if (chatId) {
+      // If chatId is provided, get messages for that specific chat
       const messages = await this.messageModel.find({
-        chatId: { $in: userChats.map(chat => chat._id) }
+        chatId: chatId
       }).sort({ updatedAt: -1 });
 
       return createResponse(HttpStatus.OK, 'Messages fetched successfully', messages);
     } else {
-      const messages = await this.messageModel.find({
-        chatId: new Types.ObjectId(chatId)
-      }).sort({ updatedAt: -1 });
+      // If no chatId, get all chats where user is a member
+      const userChats = await this.chatModel.find({
+        members: userId
+      });
 
-      if (!messages.length) {
-        return createResponse(HttpStatus.NOT_FOUND, 'No messages found', []);
-      }
-
-    return createResponse(HttpStatus.OK, 'Messages fetched successfully', messages);
+      return createResponse(HttpStatus.OK, 'Messages fetched successfully', userChats);
     }
   }
 
